@@ -95,6 +95,7 @@
     .product-editor .form-grid{gap:10px}
     .product-editor .field{margin-bottom:10px}
     .image-preview{width:70px;height:54px;object-fit:cover;vertical-align:middle;background:#eef0eb;border-radius:5px;margin-right:8px}
+    .editor-save{position:sticky;bottom:-20px;z-index:1;box-shadow:0 -8px 18px #fff}
     .status{min-height:20px;margin:12px 0;color:var(--green);font-size:13px}
     @media(max-width:900px){.products{grid-template-columns:repeat(2,minmax(0,1fr))}.product-photo{height:240px}}
     @media(max-width:600px){
@@ -154,7 +155,6 @@
           <label class="field"><span>ZIP / Postal code *</span><input name="zip" inputmode="numeric" autocomplete="postal-code" required></label>
           <label class="field full"><span>Full address *</span><textarea name="address" autocomplete="street-address" required></textarea></label>
           <label class="field"><span>Quantity (pieces) *</span><input name="quantity" id="order-quantity" type="number" min="1" step="1" required></label>
-          <label class="field"><span>Additional notes</span><input name="note" placeholder="Color, size, or other details"></label>
         </div>
         <h3 class="payment-title">Payment method</h3>
         <label class="payment-choice"><input type="radio" name="payment" value="bKash" checked><span><strong>bKash</strong><small>Pay after ordering using the merchant's instructions</small></span></label>
@@ -189,7 +189,7 @@
 
   <dialog id="editor-dialog">
     <div class="dialog-head"><h2>Edit products</h2><button class="quiet" id="editor-close" type="button" aria-label="Close">Close ×</button></div>
-    <form class="dialog-body" id="editor-form"><p style="color:#707873;font-size:12px">Manage up to 10 products. Update the image, name, description, price, and minimum bulk quantity.</p><div id="editor-products"></div><button class="button wide" type="submit">Save changes</button><p class="status" id="editor-status" role="status"></p></form>
+    <form class="dialog-body" id="editor-form"><p style="color:#707873;font-size:12px">Manage up to 10 products. Update the image, name, description, price, and minimum bulk quantity. Scroll down to save; uploaded images must be smaller than 400 KB.</p><div id="editor-products"></div><button class="button wide editor-save" type="submit">Save changes</button><p class="status" id="editor-status" role="status"></p></form>
   </dialog>
 
   <script>
@@ -233,7 +233,7 @@
     function renderProducts() {
       document.getElementById("product-list").innerHTML = products.map(product => `
         <article class="product"><div class="product-photo"><img src="${safe(getImage(product.image))}" alt="${safe(product.name)}" loading="lazy"><span class="badge">Wholesale</span></div>
-          <div class="product-info"><h3>${safe(product.name)}</h3><p>${safe(product.description)}</p><div class="product-bottom"><span class="price">${money(product.price)}<small class="minimum">Minimum ${Number(product.min)} pieces</small></span><button class="button button-small" data-order="${Number(product.id)}">Order now</button></div></div></article>`).join("");
+          <div class="product-info"><h3>${safe(product.name)}</h3><p>${safe(product.description)}</p><div class="product-bottom"><span class="price">${money(product.price)}<small class="minimum">Minimum ${Number(product.min)} pieces</small><small class="minimum">M / L / XL sizes</small></span><button class="button button-small" data-order="${Number(product.id)}">Order now</button></div></div></article>`).join("");
     }
     function showView(view) {
       document.querySelectorAll(".view").forEach(section => section.classList.toggle("active", section.id === `${view}-view`));
@@ -283,7 +283,7 @@
         quantity, unitPrice:Number(selectedProduct.price), total:Number(selectedProduct.price) * quantity,
         name:String(form.get("name")).trim(), phone:String(form.get("phone")).trim(), email:String(form.get("email")).trim(),
         city:String(form.get("city")).trim(), zip:String(form.get("zip")).trim(), address:String(form.get("address")).trim(),
-        note:String(form.get("note")).trim(), payment:String(form.get("payment")), paymentStatus:form.get("payment") === "bKash" ? "Payment verification pending" : "Cash on delivery"
+        note:"", payment:String(form.get("payment")), paymentStatus:form.get("payment") === "bKash" ? "Payment verification pending" : "Cash on delivery"
       };
       orders.push(order);
       if (!persist(DATA_KEY, orders)) {
@@ -331,6 +331,7 @@
     });
 
     function renderEditor() {
+      document.getElementById("editor-status").textContent="";
       document.getElementById("editor-products").innerHTML = products.map((product,index)=>`<section class="product-editor" data-index="${index}"><h3>Product ${index+1}</h3><div class="form-grid">
         <label class="field"><span>Product name</span><input data-field="name" value="${safe(product.name)}" required></label>
         <label class="field"><span>Price (BDT / piece)</span><input data-field="price" type="number" min="1" value="${Number(product.price)}" required></label>
@@ -367,7 +368,9 @@
     });
     document.getElementById("editor-products").addEventListener("input", event => {
       if (!event.target.matches('[data-field="image"]')) return;
-      const preview = event.target.closest(".product-editor").querySelector(".image-preview");
+      const row = event.target.closest(".product-editor");
+      delete row.dataset.image;
+      const preview = row.querySelector(".image-preview");
       preview.src = getImage(event.target.value);
     });
     document.getElementById("editor-form").addEventListener("submit", event => {
@@ -385,7 +388,7 @@
         document.getElementById("editor-status").textContent="Enter a name, description, valid price, minimum quantity, and image for every product.";
         return;
       }
-      if(!persist(STORE_KEY,updated)){document.getElementById("editor-status").textContent="Could not save. Try using smaller images.";return;}
+      if(!persist(STORE_KEY,updated)){document.getElementById("editor-status").textContent="Could not save product changes. Browser storage may be full or disabled. Try a smaller image (under 400 KB) or enable browser storage.";return;}
       products=updated;
       renderProducts();
       document.getElementById("editor-status").textContent="All 10 products have been saved.";
